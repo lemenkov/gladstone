@@ -143,9 +143,7 @@ gst_g729_enc_init (GstG729Enc * enc)
 
   enc->vad = DEFAULT_VAD;
 
-  Init_Pre_Process();
-  Init_Coder_ld8a();
-  Init_Cod_cng();
+  enc->enc = initBcg729EncoderChannel(0 /* no VAT/DTX detection */);
 }
 
 static gboolean
@@ -153,6 +151,7 @@ gst_g729_enc_stop (GstAudioEncoder * aenc)
 {
   GstG729Enc* enc = GST_G729_ENC (aenc);
 
+  closeBcg729EncoderChannel(enc->enc);
   enc->frameno = 0;
 
   return TRUE;
@@ -178,24 +177,12 @@ gst_g729_enc_set_format (GstAudioEncoder * aenc, GstAudioInfo * info)
 
 static gint g729_encode_frame (GstG729Enc* enc, const gint16* in, guint8* out){
   int i,j,index;
-  extern Word16 *new_speech;
-  gint ret = G729_FRAME_BYTES;
-
-  memcpy(new_speech,in,RAW_FRAME_BYTES);
-
-  Pre_Process(new_speech,L_FRAME);
-  Coder_ld8a(enc->parameters, enc->frameno, enc->vad);
-  prm2bits_ld8k(enc->parameters, enc->encoder_output);
+  gint ret = 0;
 
   memset (out,0x0,G729_FRAME_BYTES);
 
-  for(i=0;i<10;i++){
-    for(j=0;j<8;j++){
-      index=2+(i*8)+j;
-      out[i]|=enc->encoder_output[index]==0x81?(1<<(7-j)):0;
-    }
-  }
-
+  bcg729Encoder(enc->enc, (int16_t*)in, (uint8_t*)out, &ret);
+  /*
   switch (enc->parameters[0]){
     case G729_SID_FRAME:
       GST_DEBUG_OBJECT (enc, "SID detected");
@@ -206,6 +193,7 @@ static gint g729_encode_frame (GstG729Enc* enc, const gint16* in, guint8* out){
       ret = G729_SILENCE_BYTES;
       break;
   }
+  */
 
   return ret;
 }

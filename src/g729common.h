@@ -7,9 +7,6 @@ typedef enum {
   G729_SID_FRAME
 } frame_modes_param;
 
-#include "typedef.h"
-#include "ld8a.h"
-
 #define SAMPLE_RATE 8000
 #define FRAME_DURATION 10
 #define RAW_FRAME_SAMPLES (SAMPLE_RATE*FRAME_DURATION/1000)

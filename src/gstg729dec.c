@@ -63,8 +63,6 @@
 #include "gstg729dec.h"
 #include <string.h>
 
-void Init_Dec_cng(void);
-
 GST_DEBUG_CATEGORY_EXTERN (g729dec_debug);
 #define GST_CAT_DEFAULT g729dec_debug
 
@@ -118,40 +116,12 @@ gst_g729_dec_class_init (GstG729DecClass * klass)
   gstaudiodecoder_class->set_format = GST_DEBUG_FUNCPTR (gst_g729_dec_set_format);
 }
 
-/* TODO: move elsewhere */
-Word16 bad_lsf = 0;
-
-static void
-gst_g729_dec_reset (GstG729Dec * dec)
-{
-  dec->vad = 0;
-
-  /* ref code specific */
-  Init_Decod_ld8a();
-  Init_Post_Filter();
-  Init_Post_Process();
-  Init_Dec_cng();
-
-  /*
-   * Reference code input data initialisation
-   * First word: synchronization
-   * Second word: size
-   * subsequent 80 words: 1 word per bit (0x007f->0 0x0081->1)
-   */
-  ((guchar*)dec->refcode_input)[0]=0x21;
-  ((guchar*)dec->refcode_input)[1]=0x6B;
-  ((guchar*)dec->refcode_input)[2]=0x50;
-  ((guchar*)dec->refcode_input)[3]=0x00;
-
-  memset(dec->synth_buf,0,sizeof(dec->synth_buf));
-  dec->synth = dec->synth_buf + M;
-}
-
 static void
 gst_g729_dec_init (GstG729Dec * dec)
 {
   gst_audio_decoder_set_drainable (GST_AUDIO_DECODER (dec), FALSE);
-  gst_g729_dec_reset (dec);
+  dec->vad = 0;
+  dec->dec = initBcg729DecoderChannel();
 }
 
 static gboolean
@@ -159,7 +129,8 @@ gst_g729_dec_stop (GstAudioDecoder *adec)
 {
   GstG729Dec * dec = GST_G729_DEC (adec);
 
-  gst_g729_dec_reset (dec);
+  dec->vad = 0;
+  closeBcg729DecoderChannel(dec->dec);
 
   return TRUE;
 }
@@ -182,56 +153,19 @@ gst_g729_dec_set_format (GstAudioDecoder *adec, GstCaps *caps)
 static guint32
 g729_decode(GstG729Dec * dec, const guint8 *g729_data, guint g729_len, gint16 *pcm_data)
 {
-  guint16  i;
-
-  for(i=0;i<SERIAL_SIZE-2;i++){
-    ((guchar*)dec->refcode_input)[5+i*2]=0x00;
-    ((guchar*)dec->refcode_input)[4+i*2]=
-      (g729_data[i/8]&(1<<(7-i%8)))!=0?0x81:0x7F;
-  }
-
   switch(g729_len){
     case G729_SID_BYTES:
-      dec->parameters[1] = G729_SID_FRAME;
-      ((guchar*)dec->refcode_input)[2]=0x10;
       GST_DEBUG_OBJECT(dec, "SID frame");
+      bcg729Decoder(dec->dec, g729_data, g729_len, 0 /* no erasure */, 1 /* SID */, 0 /* not RFC3389 */, (int16_t*)pcm_data);
       break;
     case G729_SILENCE_BYTES:
-      dec->parameters[1] = G729_SILENCE_FRAME;
-      ((guchar*)dec->refcode_input)[2]=0x00;
       GST_DEBUG_OBJECT(dec, "silence frame");
+      bcg729Decoder(dec->dec, g729_data, g729_len, 1 /* erasure */, 0 /* no SID */, 1 /* RFC3389 */, (int16_t*)pcm_data);
       break;
     case G729_FRAME_BYTES:
-      dec->parameters[1] = G729_SPEECH_FRAME;
-      ((guchar*)dec->refcode_input)[2]=0x50;
+      bcg729Decoder(dec->dec, g729_data, g729_len, 0 /* no erasure */, 0 /* no SID */, 0 /* not RFC3389 */, (int16_t*)pcm_data);
       break;
   }
-
-  bits2prm_ld8k( &dec->refcode_input[1], dec->parameters);
-
-  dec->parameters[0] = 0;           /* No frame erasure */
-  if(dec->refcode_input[1] != 0) {
-   for (i=0; i < dec->refcode_input[1]; i++)
-     if (dec->refcode_input[i+2] == 0 ) 
-       dec->parameters[0] = 1;  /* frame erased     */
-  } else {
-    if(dec->refcode_input[0] != SYNC_WORD) 
-      dec->parameters[0] = 1;
-  }
-
-
-  if(dec->parameters[1] == 1) {
-    /* check parity and put 1 in dec->parameters[5] if parity error */
-    dec->parameters[5] = Check_Parity_Pitch(
-        dec->parameters[4], dec->parameters[5]);
-  }
-
-  Decod_ld8a(
-      dec->parameters, dec->synth, dec->decoded_az, dec->pitch_lag, &dec->vad);
-  Post_Filter(dec->synth, dec->decoded_az, dec->pitch_lag, dec->vad);
-  Post_Process(dec->synth, L_FRAME);
-
-  memcpy(pcm_data,dec->synth,RAW_FRAME_BYTES);
 
   return RAW_FRAME_BYTES;
 }

@@ -79,6 +79,6 @@ GST_PLUGIN_DEFINE (
     VERSION, 
     "LGPL", 
     "G729",
-    "http://code.google.com/p/gladstone/"
+    "https://github.com/drizzt/gladstone"
     )
 

@@ -17,19 +17,8 @@ AS_VERSION(gst-plugin, GST_PLUGIN_VERSION, 1, 0, 0, 1,
 dnl AM_MAINTAINER_MODE provides the option to enable maintainer mode
 AM_MAINTAINER_MODE
 
-dnl AM_REFCODE_DOWNLOAD provides the option to enable reference code download
-AM_REFCODE_DOWNLOAD
-
 dnl AM_APPLY_PATCHES provides the option to enable experimental optimisation patches
 AM_APPLY_PATCHES
-
-dnl AM_REF_G729_PATH provides the path to reference code
-AC_ARG_WITH(refcode-prefix,
-  AC_HELP_STRING([--with-refcode-prefix=PFX],
-                 [prefix where reference code is installed, if different from refspec]),
-                 G729_PATH="$withval", 
-                 G729_PATH="$PWD/refcode/Software/G729_Release3/g729AnnexB/c_codeBA/")
-AC_SUBST(G729_PATH)
 
 AM_INIT_AUTOMAKE($PACKAGE, $VERSION)
 
@@ -42,7 +31,6 @@ AM_CONFIG_HEADER(config.h)
 dnl check for tools
 AC_PROG_CC
 AC_PROG_LIBTOOL
-
 
 dnl decide on error flags
 AS_COMPILER_FLAG(-Wall, GST_WALL="no", GST_WALL="yes")
@@ -65,7 +53,6 @@ fi
 
 dnl Now we're ready to ask for gstreamer libs and cflags
 dnl And we can also ask for the right version of gstreamer
-
 
 PKG_CHECK_MODULES(GST, \
   gstreamer-$GST_MAJORMINOR >= $GST_REQUIRED,
@@ -127,5 +114,9 @@ dnl set proper LDFLAGS for plugins
 GST_PLUGIN_LDFLAGS='-module -avoid-version -export-symbols-regex [_]*\(gst_\|Gst\|GST_\).*'
 AC_SUBST(GST_PLUGIN_LDFLAGS)
 
-AC_OUTPUT(Makefile m4/Makefile src/Makefile refcode/Makefile)
+PKG_CHECK_MODULES(LIBBCG729, libbcg729 >= 1.0)
+LIBS="$LIBS $LIBBCG729_LIBS"
+CFLAGS="$CFLAGS $LIBBCG729_CFLAGS"
+
+AC_OUTPUT(Makefile m4/Makefile src/Makefile)
 

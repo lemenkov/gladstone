@@ -46,6 +46,7 @@
 
 #include <gst/gst.h>
 #include <gst/audio/audio.h>
+#include <bcg729/encoder.h>
 #include "g729common.h"
 
 G_BEGIN_DECLS
@@ -71,9 +72,7 @@ struct _GstG729Enc {
   guint16               vad;
   guint16               frameno;
 
-  /* Reference code specific */
-  guint16 parameters[PRM_SIZE+1];
-  guint16 encoder_output[SERIAL_SIZE];
+  bcg729EncoderChannelContextStruct* enc;
 };
 
 struct _GstG729EncClass {
