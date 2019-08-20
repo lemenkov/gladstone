@@ -9,8 +9,16 @@ dnl fill in your package name and version here
 dnl the fourth (nano) number should be 0 for a release, 1 for CVS,
 dnl and 2... for a prerelease
 
+dnl when going to/from release please set the nano correctly !
+dnl releases only do Wall, cvs and prerelease does Werror too
+AS_VERSION(gst-plugin, GST_PLUGIN_VERSION, 1, 0, 0, 1,
+    GST_PLUGIN_CVS="no", GST_PLUGIN_CVS="yes")
+
 dnl AM_MAINTAINER_MODE provides the option to enable maintainer mode
 AM_MAINTAINER_MODE
+
+dnl AM_APPLY_PATCHES provides the option to enable experimental optimisation patches
+AM_APPLY_PATCHES
 
 AM_INIT_AUTOMAKE($PACKAGE, $VERSION)
 
@@ -23,6 +31,17 @@ AM_CONFIG_HEADER(config.h)
 dnl check for tools
 AC_PROG_CC
 AC_PROG_LIBTOOL
+
+dnl decide on error flags
+AS_COMPILER_FLAG(-Wall, GST_WALL="no", GST_WALL="yes")
+                                                                                
+if test "x$GST_WALL" = "xyes"; then
+   GST_ERROR="$GST_ERROR -Wall"
+                                                                                
+   if test "x$GST_PLUGIN_CVS" = "xyes"; then
+     AS_COMPILER_FLAG(-Werror,GST_ERROR="$GST_ERROR -Werror",GST_ERROR="$GST_ERROR")
+   fi
+fi
 
 dnl Check for pkgconfig first
 AC_CHECK_PROG(HAVE_PKGCONFIG, pkg-config, yes, no)
@@ -99,5 +118,5 @@ PKG_CHECK_MODULES(LIBBCG729, libbcg729 >= 1.0)
 LIBS="$LIBS $LIBBCG729_LIBS"
 CFLAGS="$CFLAGS $LIBBCG729_CFLAGS"
 
-AC_OUTPUT(Makefile src/Makefile)
+AC_OUTPUT(Makefile m4/Makefile src/Makefile)
 
